@@ -8,7 +8,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_RELEASE_NOTE_WORDS = 100
-BULLET = re.compile(r"- (Fixed|Better|New|Removed) \*\*[^*]+\*\*: \S.*")
+HEADING = re.compile(r"### (New|Fixed|Better|Removed)")
+BULLET = re.compile(r"- \*\*[^*]+\*\*: \S.*")
 FIRST_PERSON_PLURAL = re.compile(
     r"\b(we|we['’](re|ve|ll|d)|us|our|ours|ourselves|let['’]s)\b", re.I
 )
@@ -38,15 +39,21 @@ def _release_notes(version: str) -> list[str]:
     return [line for line in lines[start:end] if line.strip()]
 
 
-def test_the_release_notes_are_short_bullets_in_the_fixed_format():
+def test_the_release_notes_list_short_bullets_under_new_fixed_better_or_removed():
     version = json.loads((ROOT / "config.json").read_text())["version"]
     notes = _release_notes(version)
 
     assert notes, f"CHANGELOG.md has no '## {version}' section"
-    for line in notes:
-        assert BULLET.fullmatch(line), (
-            f"Not '- Fixed|Better|New|Removed **what**: explanation' on one line: {line!r}"
-        )
+    assert HEADING.fullmatch(notes[0]), (
+        f"Not a '### New|Fixed|Better|Removed' heading: {notes[0]!r}"
+    )
+    headings = [line for line in notes if HEADING.fullmatch(line)]
+    assert len(headings) == len(set(headings)), f"A heading used twice: {headings}"
+    for line, following in zip(notes, notes[1:] + [""]):
+        if HEADING.fullmatch(line):
+            assert BULLET.fullmatch(following), f"No bullet under {line!r}"
+        else:
+            assert BULLET.fullmatch(line), f"Not '- **what**: explanation' on one line: {line!r}"
     words = sum(len(line.split()) for line in notes)
     assert words <= MAX_RELEASE_NOTE_WORDS, f"{version} release notes: {words} words"
 
