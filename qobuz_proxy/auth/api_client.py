@@ -48,7 +48,6 @@ class QobuzAPIClient:
         self.x_session_id: Optional[str] = None
         self.x_session_expires_at: int = 0
         self._session: Optional[aiohttp.ClientSession] = None
-        self._has_ws_token: bool = False
 
     async def __aenter__(self) -> "QobuzAPIClient":
         """Async context manager entry."""
@@ -172,12 +171,19 @@ class QobuzAPIClient:
 
     async def get_ws_token(self) -> Optional[WSToken]:
         """
-        Mint a Qobuz Connect WebSocket token (qws/createToken or qws/refreshToken).
+        Mint a Qobuz Connect WebSocket token (qws/createToken).
 
         The Qobuz app supplies a WS token when it connects to the device, but
         those tokens are only valid for ~60 minutes. Minting our own lets the
         device stay connected through long playback sessions without waiting
         for the app to reconnect.
+
+        Every token comes from qws/createToken with jwt=jwt_qws, where the
+        official apps get theirs, also when an earlier one is about to expire.
+        qws/refreshToken renews a different token, the API token (jwt=jwt_api)
+        the app hands to devices, so it is not used here. A failed mint also
+        drops the streaming session, so the next attempt starts a new one
+        (Qobuz may have ended it, e.g. during an outage).
 
         Returns:
             WSToken on success, None on failure
@@ -198,8 +204,7 @@ class QobuzAPIClient:
         if self.x_session_id:
             headers["X-Session-Id"] = self.x_session_id
 
-        action = "refreshToken" if self._has_ws_token else "createToken"
-        url = f"{self.API_BASE}/qws/{action}"
+        url = f"{self.API_BASE}/qws/createToken"
 
         try:
             timeout = aiohttp.ClientTimeout(total=10)
@@ -209,7 +214,8 @@ class QobuzAPIClient:
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
-                        logger.warning(f"qws/{action} failed: HTTP {resp.status} — {body[:200]}")
+                        logger.warning(f"qws/createToken failed: HTTP {resp.status} — {body[:200]}")
+                        self._forget_session()
                         return None
                     data = await resp.json()
 
@@ -220,17 +226,23 @@ class QobuzAPIClient:
                 endpoint=unquote(tok.get("endpoint", "")),
             )
             if not token.is_valid():
-                logger.warning(f"qws/{action} returned an incomplete token")
+                logger.warning("qws/createToken returned an incomplete token")
+                self._forget_session()
                 return None
 
-            self._has_ws_token = True
             validity_min = max(0, token.exp_s - int(time.time())) // 60
-            logger.info(f"Minted WebSocket token via qws/{action} (valid ~{validity_min} min)")
+            logger.info(f"Minted WebSocket token via qws/createToken (valid ~{validity_min} min)")
             return token
 
         except Exception as e:
-            logger.error(f"Failed to mint WS token: {e}")
+            logger.error(f"Failed to mint WS token: {type(e).__name__}: {e}")
+            self._forget_session()
             return None
+
+    def _forget_session(self) -> None:
+        """Start a new streaming session on the next request."""
+        self.x_session_id = None
+        self.x_session_expires_at = 0
 
     async def get_track_url(self, track_id: str, quality: int = 27) -> Optional[dict[str, Any]]:
         """

@@ -26,7 +26,7 @@ is asked.
 
 | File | Role |
 |---|---|
-| `qobuz_proxy/backends/music_assistant/connection.py` | One websocket to MA for all players. Builds a new `MusicAssistantClient` per attempt (the client is single-use), reconnects with capped backoff, stops when MA rejects the token, maps errors, times out every call, hands events to listeners by player id, remembers which backend continued a queue item last. Also the logins: username/password → a long-lived token of our own, or a check of a token made in MA. |
+| `qobuz_proxy/backends/music_assistant/connection.py` | One websocket to MA for all players. Builds a new `MusicAssistantClient` per attempt (the client is single-use), reconnects with capped backoff, stops when MA rejects the token, maps errors, times out every call, hands events to listeners by player id, keeps the Qobuz provider check current (`PROVIDERS_UPDATED`: MA loads its providers after it accepts connections), remembers which backend continued a queue item last. Also the logins: username/password → a long-lived token of our own, or a check of a token made in MA. |
 | `qobuz_proxy/backends/music_assistant/backend.py` | `MusicAssistantBackend`: one MA player or group. |
 | `qobuz_proxy/backends/music_assistant/party.py` | `Party` (gathers and releases a party speaker's members) and `PartyBackend` (the backend hook). See [Party speakers](#party-speakers). |
 | `qobuz_proxy/backends/music_assistant/home_assistant.py` | `HomeAssistant`: a small client for Home Assistant's media players, for parties grouped there. |
@@ -51,6 +51,8 @@ merge loses one. How to resolve conflicts: [CONTRIBUTING.md](../CONTRIBUTING.md#
 | `qobuz_proxy/backends/base.py` | `TrackUnavailableError`, `reports_external_resume`, `on_volume_change` and the `ExternalPlaybackAware` protocol. |
 | `qobuz_proxy/backends/types.py` | `start_position_ms` in `BackendTrackMetadata`. |
 | `qobuz_proxy/webui/routes.py` | One `register_music_assistant_routes` call (and its import). |
+| `qobuz_proxy/auth/api_client.py` | `get_ws_token` mints every Qobuz Connect token with `qws/createToken` (upstream asks `qws/refreshToken` after the first, but that renews the API token, not a WebSocket one) and forgets the streaming session after a failed mint. |
+| `qobuz_proxy/connect/ws_manager.py` | `_wait_for_new_tokens`: a speaker picked again in the app reconnects at once instead of waiting out the reconnect backoff. |
 | `pyproject.toml` | The `music-assistant` extra, the extra dev dependencies, and the mypy and pytest settings. |
 
 ## Ownership rules

@@ -249,6 +249,24 @@ async def test_the_checks_lead_the_user_through_setup_in_order(panel, server):
     assert "once Qobuz and Music Assistant are both connected" in _detail(status, "speakers")
 
 
+async def test_the_qobuz_check_turns_green_once_music_assistant_has_loaded_qobuz(panel, server):
+    # Connected right after Music Assistant started, before it loaded its Qobuz provider
+    server.remove_qobuz_provider()
+    await panel.set_up()
+    status = await panel.status()
+    assert "qobuz_in_music_assistant:error" in _levels(status)
+    assert "may still be starting it" in _detail(status, "qobuz_in_music_assistant")
+
+    server.add_qobuz_provider()
+    await wait_for(
+        lambda: panel.music_assistant.status()["connection"]["has_qobuz_provider"],
+        "Music Assistant to load Qobuz",
+        server=server,
+    )
+    status = await panel.status()
+    assert _levels(status) == "qobuz:ok music_assistant:ok qobuz_in_music_assistant:ok speakers:ok"
+
+
 async def test_the_checks_say_what_to_fix_in_music_assistant(panel, server):
     server.add_qobuz_provider(available=False)  # its Qobuz provider failed to load
     await panel.set_up()

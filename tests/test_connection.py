@@ -101,6 +101,31 @@ async def test_status_shows_the_version_and_whether_qobuz_is_a_working_provider(
     assert not connection.status.has_qobuz_provider
 
 
+async def test_the_qobuz_check_follows_music_assistant_loading_its_qobuz_provider(
+    connection, server
+):
+    # Music Assistant takes connections before its providers have loaded
+    server.remove_qobuz_provider()
+    await _connect(connection, server)
+    assert not connection.status.has_qobuz_provider
+    statuses = []
+    connection.add_status_listener(statuses.append)
+
+    server.add_qobuz_provider()  # loaded a moment later
+    await wait_for(lambda: connection.status.has_qobuz_provider, "Qobuz ready", server=server)
+
+    # Qobuz could not be reached: MA unloads the provider and loads it again later
+    server.remove_qobuz_provider()
+    await wait_for(lambda: not connection.status.has_qobuz_provider, "no Qobuz", server=server)
+    server.add_qobuz_provider()
+    await wait_for(lambda: connection.status.has_qobuz_provider, "Qobuz back", server=server)
+
+    # Still the same connection: the speakers are not told it changed
+    assert connection.status.state == ConnectionState.CONNECTED
+    assert len(server.created_clients) == 1
+    assert statuses == []
+
+
 async def test_lists_only_enabled_players_groups_and_stereo_pairs(connection, server):
     server.add_player("group", "Downstairs", type=PlayerType.GROUP, group_members=[KITCHEN])
     server.add_player("pair", "Living Room", type=PlayerType.STEREO_PAIR, available=False)

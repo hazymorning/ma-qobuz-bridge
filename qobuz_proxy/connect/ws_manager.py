@@ -5,6 +5,7 @@ Handles connection lifecycle, authentication, and message routing.
 """
 
 import asyncio
+import contextlib
 import logging
 import time
 import uuid
@@ -463,6 +464,7 @@ class WsManager:
     async def _connection_loop(self) -> None:
         """Main connection loop with reconnection logic."""
         while self._should_run:
+            token_version = self._token_version
             should_backoff = True
             try:
                 await self._connect_and_run()
@@ -479,11 +481,26 @@ class WsManager:
 
             # Exponential backoff
             logger.info(f"Reconnecting in {self._reconnect_delay:.1f}s...")
-            await asyncio.sleep(self._reconnect_delay)
+            if await self._wait_for_new_tokens(self._reconnect_delay, token_version):
+                # The app picked this speaker again: connect with its tokens right away
+                self._reconnect_delay = INITIAL_RECONNECT_DELAY
+                continue
             self._reconnect_delay = min(
                 self._reconnect_delay * RECONNECT_BACKOFF_MULTIPLIER,
                 MAX_RECONNECT_DELAY,
             )
+
+    async def _wait_for_new_tokens(self, timeout: float, token_version: int) -> bool:
+        """Wait up to ``timeout`` seconds; True as soon as the app hands over new tokens.
+
+        After a Qobuz outage the backoff is up to a minute; a speaker just picked in the app
+        must not sit that out before it joins.
+        """
+        if self._token_version == token_version:
+            self._token_update_event.clear()
+            with contextlib.suppress(asyncio.TimeoutError):
+                await asyncio.wait_for(self._token_update_event.wait(), timeout)
+        return self._token_version != token_version
 
     async def _connect_and_run(self) -> None:
         """Connect, authenticate, and handle messages."""
