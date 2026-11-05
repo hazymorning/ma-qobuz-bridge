@@ -1,7 +1,8 @@
 name: Release
 
-# Every version in config.json that reaches main gets a GitHub release, once, with its
-# CHANGELOG.md section as the notes. Home Assistant itself only reads config.json.
+# Every version in config.json that reaches main gets a GitHub release with its CHANGELOG.md
+# section as the notes; later pushes keep those notes in step with CHANGELOG.md. Home Assistant
+# itself only reads config.json.
 on:
   push:
     branches: [main]
@@ -17,15 +18,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
-      - name: Publish the release if it is new
+      - name: Publish the release, or update its notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(jq -r .version config.json)
-          if gh release view "v$version" > /dev/null 2>&1; then
-            echo "v$version is already released"
-            exit 0
-          fi
           awk -v heading="## $version" '
             $0 == heading { found = 1; next }
             found && /^## / { exit }
@@ -35,4 +32,9 @@ jobs:
             echo "CHANGELOG.md has no '## $version' section" >&2
             exit 1
           fi
-          gh release create "v$version" --target "$GITHUB_SHA" --title "$version" --notes-file notes.md
+          if gh release view "v$version" > /dev/null 2>&1; then
+            gh release edit "v$version" --notes-file notes.md
+            echo "v$version is already released; its notes now match CHANGELOG.md"
+          else
+            gh release create "v$version" --target "$GITHUB_SHA" --title "$version" --notes-file notes.md
+          fi
