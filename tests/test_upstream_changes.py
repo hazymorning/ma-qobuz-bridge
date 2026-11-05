@@ -1,5 +1,6 @@
 """What this repo changes inside upstream QobuzProxy files: the hooks in app.py, speaker.py,
-playback/player.py, backends/base.py, backends/types.py and webui/routes.py.
+playback/player.py, backends/base.py, backends/types.py and webui/routes.py, and the fixes in
+auth/api_client.py and connect/ws_manager.py.
 
 Run these after merging upstream: each one fails if the merge lost one of those changes.
 """
@@ -7,17 +8,21 @@ Run these after merging upstream: each one fails if the merge lost one of those 
 import asyncio
 import contextlib
 import functools
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 from unittest.mock import MagicMock
 
 import aiohttp
 import pytest
+from aiohttp import web
+from aiohttp.test_utils import TestServer
 from music_assistant_models.enums import PlaybackState as MusicAssistantState
 
 from qobuz_proxy import app as app_module
 from qobuz_proxy import speaker as speaker_module
 from qobuz_proxy.app import QobuzProxy
+from qobuz_proxy.auth.api_client import QobuzAPIClient
 from qobuz_proxy.backends import BackendTrackMetadata, PlaybackState
 from qobuz_proxy.backends.base import AudioBackend
 from qobuz_proxy.backends.music_assistant import connection as connection_module
@@ -34,6 +39,7 @@ from tests.fake_qobuz import (
     StubDiscovery,
     StubMetadata,
     album_state,
+    make_tokens,
     set_active,
     set_max_quality,
     set_volume,
@@ -331,3 +337,98 @@ async def test_a_speaker_the_next_start_would_reject_is_refused_in_the_web_ui_an
     assert [(s["name"], s["config"]["dlna_ip"]) for s in listed] == [
         ("Living Room", "192.168.1.20")
     ]
+
+
+class FakeQobuzApi:
+    """The two Qobuz API calls behind a WebSocket token: session/start and qws/createToken."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+        self.fail_next = 0  # HTTP status for the next token request
+        self._sessions = 0
+        self._tokens = 0
+        app = web.Application()
+        app.router.add_post("/session/start", self._start_session)
+        app.router.add_post("/qws/{action}", self._token)
+        self.server = TestServer(app)
+
+    async def _start_session(self, request: web.Request) -> web.Response:
+        self._sessions += 1
+        self.calls.append("session/start")
+        expires_at = int(time.time()) + 3600
+        return web.json_response({"session_id": f"s{self._sessions}", "expires_at": expires_at})
+
+    async def _token(self, request: web.Request) -> web.Response:
+        action, body = request.match_info["action"], await request.text()
+        self.calls.append(f"qws/{action} {body} {request.headers.get('X-Session-Id')}")
+        if self.fail_next:
+            status, self.fail_next = self.fail_next, 0
+            return web.Response(status=status, text="Service Unavailable")
+        if action != "createToken" or body != "jwt=jwt_qws":
+            # qws/refreshToken renews the API token, which carries no WebSocket endpoint
+            return web.json_response({"jwt_api": {"jwt": "api", "exp": int(time.time()) + 3600}})
+        self._tokens += 1
+        token = {"jwt": f"jwt{self._tokens}", "exp": int(time.time()) + 3600}
+        return web.json_response({"jwt_qws": {**token, "endpoint": "wss%3A%2F%2Fqws.test%2Fws"}})
+
+
+@pytest.fixture
+async def qobuz_api(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[FakeQobuzApi]:
+    api = FakeQobuzApi()
+    await api.server.start_server()
+    monkeypatch.setattr(QobuzAPIClient, "API_BASE", str(api.server.make_url("")).rstrip("/"))
+    try:
+        yield api
+    finally:
+        await api.server.close()
+
+
+def _logged_in_api_client() -> QobuzAPIClient:
+    client = QobuzAPIClient("app-id", "app-secret")
+    client.user_auth_token = "user-token"
+    return client
+
+
+async def test_every_qobuz_websocket_token_the_add_on_mints_comes_from_create_token(qobuz_api):
+    client = _logged_in_api_client()  # shared by all speakers in the add-on
+
+    tokens = [await client.get_ws_token() for _ in range(3)]
+
+    assert [(t.jwt, t.endpoint) for t in tokens if t] == [
+        ("jwt1", "wss://qws.test/ws"),
+        ("jwt2", "wss://qws.test/ws"),
+        ("jwt3", "wss://qws.test/ws"),
+    ]
+    assert qobuz_api.calls == ["session/start"] + ["qws/createToken jwt=jwt_qws s1"] * 3
+
+
+async def test_after_a_failed_token_mint_the_next_one_starts_a_new_qobuz_session(qobuz_api):
+    client = _logged_in_api_client()
+    assert await client.get_ws_token() is not None
+
+    qobuz_api.fail_next = 503  # Qobuz is having an outage
+    assert await client.get_ws_token() is None
+    token = await client.get_ws_token()
+
+    assert token is not None and token.jwt == "jwt2"
+    assert qobuz_api.calls == [
+        "session/start",
+        "qws/createToken jwt=jwt_qws s1",
+        "qws/createToken jwt=jwt_qws s1",
+        "session/start",
+        "qws/createToken jwt=jwt_qws s2",
+    ]
+
+
+async def test_a_speaker_picked_again_in_the_app_rejoins_without_waiting_out_the_backoff(rig):
+    # Qobuz dropped the speaker; after an outage the next try would be a minute away
+    rig.ws._reconnect_delay = 60.0
+    await rig.cloud.sockets[-1].close()
+    await rig.wait_for(lambda: not rig.ws.is_connected, "the speaker to lose the Qobuz cloud")
+    sockets = len(rig.cloud.sockets)
+
+    # Qobuz is back and the user picks the speaker again: select() gives it 3 s to join
+    await rig.select(make_tokens(session_id=rig.tokens.session_id, jwt="fresh-jwt"))
+
+    assert len(rig.cloud.sockets) == sockets + 1
+    assert rig.ws.is_renderer_active

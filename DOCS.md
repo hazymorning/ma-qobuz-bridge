@@ -53,7 +53,7 @@ The top of the panel says what is wrong and what to do:
 |---|---|
 | **Qobuz account** | Log in to Qobuz (step 4). If you were logged in before, the login expired: log in again. |
 | **Music Assistant** | "Connecting…": wait a few seconds. "Can't reach Music Assistant": check that it runs and the address is right; the add-on keeps retrying. "No longer accepts the saved login": the token was removed or expired; connect again. |
-| **Qobuz in Music Assistant** | Shown once connected. Add Qobuz under **Settings → Providers** in Music Assistant. |
+| **Qobuz in Music Assistant** | Shown once connected. Add Qobuz under **Settings → Providers** in Music Assistant. If it is set up, wait: Music Assistant loads it a moment after it starts, and again later when Qobuz had an outage. The check turns green by itself. |
 | **Speakers in the Qobuz app** | Turn on **All my Music Assistant players** or tick some players, and fix the checks above. |
 
 ## Which players show up

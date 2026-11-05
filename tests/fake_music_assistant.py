@@ -341,6 +341,11 @@ class FakeMusicAssistantServer:
         self._emit(EventType.PROVIDERS_UPDATED, None, self.providers)
         return provider
 
+    def remove_qobuz_provider(self) -> None:
+        """MA unloads its Qobuz provider, e.g. it could not reach Qobuz (PROVIDERS_UPDATED)."""
+        self.providers = [p for p in self.providers if p.domain != "qobuz"]
+        self._emit(EventType.PROVIDERS_UPDATED, None, self.providers)
+
     def set_player_volume(self, player_id: str, level: int) -> None:
         """Volume changed in MA's UI or on the speaker (a group's sets all its members)."""
         with self._operation():

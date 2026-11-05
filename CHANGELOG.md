@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.2
+
+- The **Qobuz in Music Assistant** check no longer stays red while Music Assistant's Qobuz
+  provider works ([reported here](https://github.com/hazymorning/ma-qobuz-bridge/issues/8)). The
+  add-on looked only once, right after connecting, but Music Assistant loads its providers a
+  moment after it starts, and again later when Qobuz had an outage. The check now follows Music
+  Assistant and turns green by itself.
+- This may also fix speakers that stopped working lately, though we can't be sure. Speakers
+  renew their Qobuz Connect login about every hour. After the first renewal they used a different
+  Qobuz request, which as far as we can tell renews another kind of login. Speakers could then
+  drop out of the Qobuz app until you picked them again. Every renewal now uses the request the
+  Qobuz apps use.
+- After a Qobuz outage: a failed renewal starts a new Qobuz session for the next try, and a
+  speaker you pick again in the Qobuz app connects at once instead of up to a minute later.
+
 ## 0.4.1
 
 - Play after a pause works on every speaker, WiiM speakers included (they stayed silent). Play

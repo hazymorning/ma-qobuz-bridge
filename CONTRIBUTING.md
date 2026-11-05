@@ -85,9 +85,10 @@ git merge upstream/main
 
 - `README.md`, `CONTRIBUTING.md`, `.github/` and `qobuz_proxy/webui/static/index.html`: keep ours.
 - The hooks in `qobuz_proxy/app.py`, `qobuz_proxy/speaker.py`, `qobuz_proxy/playback/player.py`,
-  `qobuz_proxy/backends/base.py`, `qobuz_proxy/backends/types.py` and
-  `qobuz_proxy/webui/routes.py`: keep both sides. Never take ours for `routes.py`: we only add two
-  lines there. Then run `uv run pytest tests/test_upstream_changes.py` and the rest of the checks.
+  `qobuz_proxy/backends/base.py`, `qobuz_proxy/backends/types.py`, `qobuz_proxy/webui/routes.py`,
+  `qobuz_proxy/auth/api_client.py` and `qobuz_proxy/connect/ws_manager.py`: keep both sides.
+  Never take ours for `routes.py`: we only add two lines there. Then run
+  `uv run pytest tests/test_upstream_changes.py` and the rest of the checks.
 - `pyproject.toml`, `.gitignore`, `.dockerignore`: keep both sides.
 - `uv.lock`: take ours, then run `uv lock` and `uv sync`.
 - Anything upstream has that this repo deleted: its tests (every file in `tests/` except

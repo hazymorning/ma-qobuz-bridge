@@ -105,8 +105,10 @@ def build_checks(qobuz: dict[str, Any], status: dict[str, Any]) -> list[dict[str
                 "qobuz_in_music_assistant",
                 "error",
                 "Qobuz in Music Assistant",
-                "Music Assistant has no working Qobuz provider. In Music Assistant open "
-                "Settings → Providers and add Qobuz.",
+                "Music Assistant's Qobuz provider is not running. If you set it up, Music "
+                "Assistant may still be starting it or can't reach Qobuz right now; this check "
+                "updates by itself. If not, add Qobuz under Settings → Providers in Music "
+                "Assistant.",
             )
         )
 

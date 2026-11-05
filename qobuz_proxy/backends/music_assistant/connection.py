@@ -9,7 +9,7 @@ import asyncio
 import contextlib
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Any, Awaitable, Callable, Optional, TypeVar
 
@@ -20,7 +20,7 @@ from music_assistant_client.exceptions import (
     InvalidServerVersion,
     MusicAssistantClientException,
 )
-from music_assistant_models.enums import PlayerType
+from music_assistant_models.enums import EventType, PlayerType
 from music_assistant_models.errors import (
     AuthenticationFailed,
     AuthenticationRequired,
@@ -71,7 +71,7 @@ class ConnectionStatus:
     state: ConnectionState
     message: str = ""  # plain language, shown in the web UI
     server_version: str = ""
-    has_qobuz_provider: bool = False  # MA has a working Qobuz provider
+    has_qobuz_provider: bool = False  # MA has a working Qobuz provider right now
 
 
 @dataclass(frozen=True)
@@ -91,6 +91,11 @@ class NotConnectedError(RuntimeError):
 
 def _unreachable_message(url: str) -> str:
     return f"Can't reach Music Assistant at {url}. Is the Music Assistant add-on running?"
+
+
+def _has_qobuz_provider(client: MusicAssistantClient) -> bool:
+    """Whether MA runs a Qobuz provider now (it loads providers after it accepts connections)."""
+    return any(p.domain == "qobuz" and p.available for p in client.providers)
 
 
 def _token_rejected(err: Exception) -> bool:
@@ -277,6 +282,8 @@ class MusicAssistantConnection:
 
     def _dispatch(self, event: Any) -> None:
         """Hand one MA event to its listeners (a failing one must not end the client's loop)."""
+        if event.event == EventType.PROVIDERS_UPDATED:
+            self._update_qobuz_provider()
         listeners = self._event_listeners.get(None, []) + self._event_listeners.get(
             event.object_id, []
         )
@@ -285,6 +292,27 @@ class MusicAssistantConnection:
                 listener(event)
             except Exception:
                 logger.exception("Music Assistant event listener failed")
+
+    def _update_qobuz_provider(self) -> None:
+        """MA loaded, reloaded or unloaded a provider: keep the Qobuz check current.
+
+        MA accepts connections before its providers have loaded, and loads its Qobuz provider
+        again later when Qobuz had an outage (2 minutes after a server error). Status
+        listeners follow the connection itself, so this changes the status without calling
+        them; the panel reads it on every poll.
+        """
+        client, status = self._client, self._status
+        if client is None or status.state != ConnectionState.CONNECTED:
+            return
+        ready = _has_qobuz_provider(client)
+        if ready == status.has_qobuz_provider:
+            return
+        logger.info(
+            "Music Assistant's Qobuz provider is ready"
+            if ready
+            else "Music Assistant's Qobuz provider stopped"
+        )
+        self._status = replace(status, has_qobuz_provider=ready)
 
     def _run_in_background(self, coro: Awaitable[Any]) -> None:
         task = asyncio.ensure_future(coro)
@@ -371,7 +399,7 @@ class MusicAssistantConnection:
             self._timeouts_in_a_row = 0
             assert client.server_info is not None  # set by connect()
             version = client.server_info.server_version
-            has_qobuz_provider = any(p.domain == "qobuz" and p.available for p in client.providers)
+            has_qobuz_provider = _has_qobuz_provider(client)
             self._set_status(
                 ConnectionState.CONNECTED,
                 f"Connected to Music Assistant {version}.",
@@ -381,7 +409,7 @@ class MusicAssistantConnection:
             logger.info(
                 f"Connected to Music Assistant {version} at {self._url} "
                 f"({len(self.players())} players, "
-                f"{'Qobuz provider ready' if has_qobuz_provider else 'no Qobuz provider'})"
+                f"{'Qobuz provider ready' if has_qobuz_provider else 'no Qobuz provider yet'})"
             )
             try:
                 await listen
