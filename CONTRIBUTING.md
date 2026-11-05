@@ -114,10 +114,16 @@ Add a `## <version>` entry to `CHANGELOG.md` and bump `version` in `config.json`
 `main`, Home Assistant offers the update and the **Release** workflow publishes `v<version>` on
 GitHub with the changelog entry as its notes. A later fix to the entry updates the notes.
 
-The entry: at most 100 words, one unwrapped line per bullet (GitHub turns every newline in
-release notes into a line break), each bullet `- Fixed|Better|New|Removed **what**: explanation`.
+The entry: at most 100 words, a heading for each kind of change (`### New`, `### Fixed`,
+`### Better`, `### Removed`), and under it one unwrapped line per change,
+`- **what**: explanation` (GitHub turns every newline in release notes into a line break).
 
 ```markdown
-- Fixed **Qobuz in Music Assistant check**: stayed red while Music Assistant's Qobuz provider worked.
-- New **Party speakers**: one speaker in the Qobuz app that plays on a whole group.
+### Fixed
+
+- **Qobuz in Music Assistant check**: stayed red while Music Assistant's Qobuz provider worked.
+
+### New
+
+- **Party speakers**: one speaker in the Qobuz app that plays on a whole group.
 ```

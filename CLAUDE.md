@@ -13,13 +13,19 @@ messages, pull request descriptions and GitHub comments.
 The `## <version>` section of `CHANGELOG.md` is published as the GitHub release notes.
 
 - At most 100 words.
+- One heading per kind of change: `### New`, `### Fixed`, `### Better` or `### Removed`, each
+  used once and only when it has items.
+- Under each heading, one bullet per change: `- **<what>**: <short explanation>`.
 - One line per bullet, never wrapped: GitHub release notes turn every newline into a line break.
-- Every bullet is `- <Label> **<what>**: <short explanation>`, with the label `Fixed`, `Better`,
-  `New` or `Removed`.
 
 ```markdown
-- Fixed **Qobuz in Music Assistant check**: stayed red while Music Assistant's Qobuz provider worked.
-- New **Party speakers**: one speaker in the Qobuz app that plays on a whole group.
+### Fixed
+
+- **Qobuz in Music Assistant check**: stayed red while Music Assistant's Qobuz provider worked.
+
+### New
+
+- **Party speakers**: one speaker in the Qobuz app that plays on a whole group.
 ```
 
 `tests/test_writing.py` checks both rules in CI.

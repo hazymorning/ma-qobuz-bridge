@@ -2,9 +2,14 @@
 
 ## 0.4.2
 
-- Fixed **Qobuz in Music Assistant check**: stayed red while Music Assistant's Qobuz provider worked. Now updates whenever Music Assistant loads or drops it.
-- Fixed **Qobuz login renewal**: every renewal after the first used a request the Qobuz apps don't use, so speakers could drop out of the Qobuz app. Might fix speakers that stopped working lately.
-- Better **recovery after Qobuz outages**: a failed renewal retries with a new Qobuz session, and a speaker picked again in the Qobuz app connects at once instead of up to a minute later.
+### Fixed
+
+- **Qobuz in Music Assistant check**: stayed red while Music Assistant's Qobuz provider worked. Now updates whenever Music Assistant loads or drops it.
+- **Qobuz login renewal**: every renewal after the first used a request the Qobuz apps don't use, so speakers could drop out of the Qobuz app. Might fix speakers that stopped working lately.
+
+### Better
+
+- **Recovery after Qobuz outages**: a failed renewal retries with a new Qobuz session, and a speaker picked again in the Qobuz app connects at once instead of up to a minute later.
 
 ## 0.4.1
 
