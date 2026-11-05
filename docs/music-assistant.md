@@ -26,7 +26,7 @@ is asked.
 
 | File | Role |
 |---|---|
-| `qobuz_proxy/backends/music_assistant/connection.py` | One websocket to MA for all players. Builds a new `MusicAssistantClient` per attempt (the client is single-use), reconnects with capped backoff, stops when MA rejects the token, maps errors, times out every call, hands events to listeners by player id, keeps the Qobuz provider check current (`PROVIDERS_UPDATED`: MA loads its providers after it accepts connections), remembers which backend continued a queue item last. Also the logins: username/password → a long-lived token of our own, or a check of a token made in MA. |
+| `qobuz_proxy/backends/music_assistant/connection.py` | One websocket to MA for all players. Builds a new `MusicAssistantClient` per attempt (the client is single-use), reconnects with capped backoff, stops when MA rejects the token, maps errors, times out every call, hands events to listeners by player id, keeps the Qobuz provider check current (`PROVIDERS_UPDATED`: MA loads its providers after it accepts connections), remembers which backend continued a queue item last. Also the logins: username/password → a long-lived token made for the bridge, or a check of a token made in MA. |
 | `qobuz_proxy/backends/music_assistant/backend.py` | `MusicAssistantBackend`: one MA player or group. |
 | `qobuz_proxy/backends/music_assistant/party.py` | `Party` (gathers and releases a party speaker's members) and `PartyBackend` (the backend hook). See [Party speakers](#party-speakers). |
 | `qobuz_proxy/backends/music_assistant/home_assistant.py` | `HomeAssistant`: a small client for Home Assistant's media players, for parties grouped there. |
@@ -59,8 +59,8 @@ merge loses one. How to resolve conflicts: [CONTRIBUTING.md](../CONTRIBUTING.md#
 
 Keep these when changing the backend:
 
-- MA queue items the backend created are "ours" (kept in the settings file across restarts).
-- Only while *attached* (the Qobuz app plays through us) may MA events make the QobuzPlayer advance
+- MA queue items the backend created are its own (kept in the settings file across restarts).
+- Only while *attached* (the Qobuz app plays through the backend) may MA events make the QobuzPlayer advance
   (`track_ended`, `next_track_started`). After a stop, an interruption, an end of queue or an
   add-on restart the backend is detached: it follows MA but never advances. That prevents
   fight-back and double plays.
@@ -81,7 +81,7 @@ Keep these when changing the backend:
 | play of the track MA already plays or has paused (e.g. after an add-on restart) | continued where it is (`seek` to its spot if paused), not added again |
 | next track known | `play_media` `replace_next` once MA really plays the current track (gapless) |
 | next (already queued) | `play_index` on the queued item |
-| pause / stop / seek | `pause` / `stop` / `seek` (only while MA still plays our item) |
+| pause / stop / seek | `pause` / `stop` / `seek` (only while MA still plays the backend's item) |
 | resume | `seek` to where the track paused: MA starts its stream again there. Not MA's unpause (`play`), which leaves it to the player to carry on with the stream it paused; a WiiM does not, and MA does not notice. After 30 s paused MA restarts the stream this way itself. |
 | seek while paused | nothing yet (a seek in MA always plays); resume starts the track at the new spot |
 | volume | `players/cmd/group_volume` (MA applies it as a plain volume set on a single player) |
@@ -92,15 +92,15 @@ Keep these when changing the backend:
 
 | Music Assistant | Qobuz app |
 |---|---|
-| moves onto our queued next item | next track |
-| our item idle near its end, no MA play action just before | track ended → next track or end of queue |
+| moves onto the backend's queued next item | next track |
+| the backend's item idle near its end, no MA play action just before | track ended → next track or end of queue |
 | stop in MA, idle mid-track or right after a next/seek in MA, queue cleared, "previous" to an older item | stopped at that position (session kept) |
-| the player never starts our track, or reports it playing far past its end | stopped |
+| the player never starts the backend's track, or reports it playing far past its end | stopped |
 | paused / playing again / seek / volume | the same in the app |
 | anything else on the queue, or another source on the player | external playback: session released |
 | unreachable for 20 s while playing | stopped |
 
-MA events reach `_on_event`, which runs `_check_queue` and, for our current item,
+MA events reach `_on_event`, which runs `_check_queue` and, for the backend's current item,
 `_check_our_item`. What the QobuzPlayer must act on is pushed through the `AudioBackend`
 callbacks: track ends (`_report_ended`), next tracks (`_promote_armed`), stops
 (`_report_interrupted`), seeks (`_update_position`) and volume (`_report_device_volume`). A pause

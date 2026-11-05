@@ -25,7 +25,7 @@ these and an image build on every push and pull request.
 | Path | What |
 |---|---|
 | `qobuz_proxy/backends/music_assistant/` | The bridge: connection, backend, speakers, settings, party speakers, the Home Assistant client |
-| `qobuz_proxy/webui/music_assistant_routes.py`, `qobuz_proxy/webui/static/index.html`, `qobuz_proxy/webui/static/panel.js`, `qobuz_proxy/webui/static/panel.css` | The panel and its API. `qobuz_proxy/webui/static/app.js` and the `/api/speakers` routes are upstream's UI; our `index.html` does not load them. |
+| `qobuz_proxy/webui/music_assistant_routes.py`, `qobuz_proxy/webui/static/index.html`, `qobuz_proxy/webui/static/panel.js`, `qobuz_proxy/webui/static/panel.css` | The panel and its API. `qobuz_proxy/webui/static/app.js` and the `/api/speakers` routes are upstream's UI; this repo's `index.html` does not load them. |
 | `config.json`, `Dockerfile.amd64`, `Dockerfile.aarch64`, `rootfs/start.py`, `translations/`, `repository.yaml`, `icon.png`, `logo.png`, `DOCS.md`, `CHANGELOG.md` | The Home Assistant add-on |
 | `tests/` | The tests (see below) |
 | `docs/music-assistant.md` | How the bridge works. `docs/images/addon-icon.svg` and `addon-logo.svg` are the drawings behind `icon.png` and `logo.png`. |
@@ -74,6 +74,8 @@ The test files:
   login, the player choice, request validation and the guard against other sites.
 - `tests/test_upstream_changes.py`: the hooks in upstream files; each test fails if a merge lost
   one.
+- `tests/test_writing.py`: the writing rules in `CLAUDE.md`: the release notes format, and no
+  first-person plural in the repo's own text.
 
 ## Merging upstream
 
@@ -83,14 +85,14 @@ git fetch upstream
 git merge upstream/main
 ```
 
-- `README.md`, `CONTRIBUTING.md`, `.github/` and `qobuz_proxy/webui/static/index.html`: keep ours.
+- `README.md`, `CONTRIBUTING.md`, `.github/` and `qobuz_proxy/webui/static/index.html`: keep this repo's version.
 - The hooks in `qobuz_proxy/app.py`, `qobuz_proxy/speaker.py`, `qobuz_proxy/playback/player.py`,
   `qobuz_proxy/backends/base.py`, `qobuz_proxy/backends/types.py`, `qobuz_proxy/webui/routes.py`,
   `qobuz_proxy/auth/api_client.py` and `qobuz_proxy/connect/ws_manager.py`: keep both sides.
-  Never take ours for `routes.py`: we only add two lines there. Then run
+  Never take this repo's version of `routes.py`: it only adds two lines to upstream's. Then run
   `uv run pytest tests/test_upstream_changes.py` and the rest of the checks.
 - `pyproject.toml`, `.gitignore`, `.dockerignore`: keep both sides.
-- `uv.lock`: take ours, then run `uv lock` and `uv sync`.
+- `uv.lock`: take this repo's version, then run `uv lock` and `uv sync`.
 - Anything upstream has that this repo deleted: its tests (every file in `tests/` except
   `__init__.py` and the ones listed above), `scripts/`, its notes and its editor settings. `git rm`
   them again, whether they conflict or are new.
@@ -110,4 +112,12 @@ makes it readable only by itself, so remove it with `sudo rm -rf "$data"`.
 
 Add a `## <version>` entry to `CHANGELOG.md` and bump `version` in `config.json`. Once that is on
 `main`, Home Assistant offers the update and the **Release** workflow publishes `v<version>` on
-GitHub with the changelog entry as its notes.
+GitHub with the changelog entry as its notes. A later fix to the entry updates the notes.
+
+The entry: at most 100 words, one unwrapped line per bullet (GitHub turns every newline in
+release notes into a line break), each bullet `- Fixed|Better|New|Removed **what**: explanation`.
+
+```markdown
+- Fixed **Qobuz in Music Assistant check**: stayed red while Music Assistant's Qobuz provider worked.
+- New **Party speakers**: one speaker in the Qobuz app that plays on a whole group.
+```
