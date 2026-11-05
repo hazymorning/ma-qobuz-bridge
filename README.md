@@ -1,12 +1,13 @@
+> [!NOTE]
+> This is a personal project, built because no ready-made solution existed. The repo is public only so it's easy to add in Home Assistant. No support is provided and there's no commitment to fixes or a timeline, but pull requests are welcome.
+
+
 # MA Qobuz Bridge
 
 A Home Assistant add-on that puts your Music Assistant players and groups in the device list of
 the Qobuz app. Pick one and press play: Music Assistant plays the music and shows the track,
 artwork and progress. Pause, skip, seek and volume work from both the Qobuz app and Music
 Assistant. Based on [QobuzProxy](https://github.com/leolobato/qobuz-proxy).
-
-> [!NOTE]
-> This is a personal project, built because no ready-made solution existed. The repo is public only so it's easy to add in Home Assistant. No support is provided and there's no commitment to fixes or a timeline, but pull requests are welcome.
 
 You need Home Assistant OS (or Supervised), Music Assistant with Qobuz set up as a provider, and
 a Qobuz subscription.
